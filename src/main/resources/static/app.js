@@ -43,9 +43,10 @@
     }, 1000);
 })();
 
-// Set this to your live Backend URL (e.g., https://your-backend.railway.app)
-const API_BASE = window.location.origin;
-// const API_BASE = "https://your-backend.railway.app";
+// Set this to your live Backend URL
+const API_BASE = "https://web-production-54120.up.railway.app";
+// const API_BASE = window.location.origin; 
+
 
 // ── State ──
 let currentLayer = 'layer-hero';
