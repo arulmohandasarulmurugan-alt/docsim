@@ -1,10 +1,13 @@
 # Build Stage
-FROM maven:3.8-openjdk-17-slim AS build
+FROM maven:3.9.6-eclipse-temurin-17 AS build
+WORKDIR /app
 COPY . .
 RUN mvn clean package -DskipTests
 
 # Run Stage
-FROM openjdk:17-jdk-slim
-COPY --from=build /target/*.jar app.jar
+FROM eclipse-temurin:17-jre-jammy
+WORKDIR /app
+COPY --from=build /app/target/*.jar app.jar
 EXPOSE 9090
-ENTRYPOINT ["java", "-Xmx512m", "-Dserver.port=${PORT:9090}", "-jar", "/app.jar"]
+# Using higher memory limit and clear port binding
+ENTRYPOINT ["java", "-Xmx512m", "-Dserver.port=${PORT:9090}", "-jar", "app.jar"]
