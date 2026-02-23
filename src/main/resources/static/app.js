@@ -255,17 +255,35 @@ async function compareDouble() {
     const fd = new FormData();
     fd.append('file1', document.getElementById('file1').files[0]);
     fd.append('file2', document.getElementById('file2').files[0]);
-    const res = await fetch(`${API_BASE}/api/compare`, { method: 'POST', body: fd });
-    if (!res.ok) throw new Error('API Error');
-    return res.json();
+
+    try {
+        const res = await fetch(`${API_BASE}/api/compare`, { method: 'POST', body: fd });
+        if (!res.ok) {
+            const errBody = await res.text().catch(() => 'No detail');
+            throw new Error(`Server Error (${res.status}): ${errBody.substring(0, 50)}`);
+        }
+        return res.json();
+    } catch (e) {
+        console.error('Fetch error:', e);
+        throw e;
+    }
 }
 
 async function compareBulk() {
     const fd = new FormData();
     Array.from(document.getElementById('bulkFiles').files).forEach(f => fd.append('files', f));
-    const res = await fetch(`${API_BASE}/api/bulk-compare`, { method: 'POST', body: fd });
-    if (!res.ok) throw new Error('API Error');
-    return res.json();
+
+    try {
+        const res = await fetch(`${API_BASE}/api/bulk-compare`, { method: 'POST', body: fd });
+        if (!res.ok) {
+            const errBody = await res.text().catch(() => 'No detail');
+            throw new Error(`Server Error (${res.status}): ${errBody.substring(0, 50)}`);
+        }
+        return res.json();
+    } catch (e) {
+        console.error('Fetch error:', e);
+        throw e;
+    }
 }
 
 // ══════════════════════════════════════════════
