@@ -1,1 +1,1 @@
-web: java -jar target/*.jar
+web: java -Xmx512m -Dserver.port=${PORT:9090} -jar target/*.jar
