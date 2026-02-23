@@ -1,0 +1,4 @@
+This is the second test document.
+It also talks about programming and software development.
+Java is a popular programming language used for building applications.
+Python is another language often used for data science and machine learning.

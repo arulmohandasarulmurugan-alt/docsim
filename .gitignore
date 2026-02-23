@@ -1,0 +1,9 @@
+target/
+*.class
+.mvn/
+.idea/
+*.iml
+*.log
+.DS_Store
+docsim_backup.sql
+similarity_db_backup.sql
