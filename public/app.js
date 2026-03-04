@@ -1,5 +1,6 @@
 const layers = Array.from(document.querySelectorAll(".layer"));
 const parallaxTargets = Array.from(document.querySelectorAll(".parallax"));
+const revealTargets = Array.from(document.querySelectorAll(".reveal"));
 
 const enterSystemBtn = document.getElementById("enterSystemBtn");
 const startScanBtn = document.getElementById("startScanBtn");
@@ -17,17 +18,38 @@ const historyError = document.getElementById("historyError");
 const resultsGrid = document.getElementById("resultsGrid");
 const historyTableBody = document.getElementById("historyTableBody");
 
-let lastScanResults = [];
+const featureCarousel = document.getElementById("featureCarousel");
+const carouselPrev = document.getElementById("carouselPrev");
+const carouselNext = document.getElementById("carouselNext");
+const bookElement = document.querySelector(".book");
+const heroTitle = document.getElementById("heroTitle");
+const heroPanel = document.querySelector("#layer1 .panel-scroll");
+
+let pointerX = 0;
+let pointerY = 0;
+let bookScrollOffset = 0;
 
 function showLayer(layerNumber) {
   layers.forEach((layer) => {
-    const isActive = Number(layer.dataset.layer) === layerNumber;
-    layer.classList.toggle("active", isActive);
+    layer.classList.toggle("active", Number(layer.dataset.layer) === layerNumber);
   });
+
+  const activeLayer = layers.find((layer) => Number(layer.dataset.layer) === layerNumber);
+  playLayerReveals(activeLayer);
+  if (layerNumber === 1) {
+    playHeroReveal();
+    window.setTimeout(() => {
+      if (heroPanel) {
+        heroPanel.scrollTop = 0;
+      }
+    }, 0);
+  }
 }
 
 function setText(el, text) {
-  el.textContent = text || "";
+  if (el) {
+    el.textContent = text || "";
+  }
 }
 
 function clearMessages() {
@@ -39,11 +61,7 @@ function clearMessages() {
 
 function updateFileCount() {
   const total = filesInput.files.length;
-  if (total === 0) {
-    setText(fileCount, "No files selected");
-    return;
-  }
-  setText(fileCount, `${total} file${total > 1 ? "s" : ""} selected`);
+  setText(fileCount, total ? `${total} file${total > 1 ? "s" : ""} selected` : "No files selected");
 }
 
 function validateFiles(files) {
@@ -70,21 +88,36 @@ function renderResults(results) {
   resultsGrid.innerHTML = "";
 
   if (!results.length) {
-    resultsGrid.innerHTML = '<article class="result-card"><h3>No comparable pairs were produced.</h3><p>Try different files.</p></article>';
+    const emptyCard = document.createElement("article");
+    emptyCard.className = "result-card";
+    const title = document.createElement("h3");
+    title.textContent = "No comparable pairs were produced.";
+    const subtitle = document.createElement("p");
+    subtitle.textContent = "Try different files.";
+    emptyCard.appendChild(title);
+    emptyCard.appendChild(subtitle);
+    resultsGrid.appendChild(emptyCard);
     return;
   }
 
   const fragment = document.createDocumentFragment();
-
   results.forEach((item, index) => {
     const card = document.createElement("article");
     card.className = "result-card";
-    card.style.animationDelay = `${Math.min(index * 0.04, 0.35)}s`;
-    card.innerHTML = `
-      <h3>${item.file_name_1}<br>vs<br>${item.file_name_2}</h3>
-      <p>Similarity</p>
-      <strong>${Number(item.similarity_percentage).toFixed(2)}%</strong>
-    `;
+    card.style.animationDelay = `${Math.min(index * 0.045, 0.35)}s`;
+    const title = document.createElement("h3");
+    title.append(
+      document.createTextNode(item.file_name_1),
+      document.createElement("br"),
+      document.createTextNode("vs"),
+      document.createElement("br"),
+      document.createTextNode(item.file_name_2)
+    );
+    const label = document.createElement("p");
+    label.textContent = "Similarity";
+    const score = document.createElement("strong");
+    score.textContent = `${Number(item.similarity_percentage).toFixed(2)}%`;
+    card.append(title, label, score);
 
     card.addEventListener("mousemove", (event) => {
       const rect = card.getBoundingClientRect();
@@ -122,19 +155,23 @@ async function startScan() {
   files.forEach((file) => formData.append("files", file));
 
   try {
-    const response = await fetch("/api/scan/compare", {
-      method: "POST",
-      body: formData
-    });
-
-    const payload = await response.json();
+    const response = await fetch("/api/scan/compare", { method: "POST", body: formData });
+    const payload = await response.json().catch(() => ({}));
 
     if (!response.ok) {
-      throw new Error(payload.message || "Scan request failed.");
+      const errorMessage = payload.error ? `${payload.message} ${payload.error}` : (payload.message || "Scan request failed.");
+      throw new Error(errorMessage);
     }
 
-    lastScanResults = payload.results || [];
-    renderResults(lastScanResults);
+    renderResults(payload.results || []);
+    if (Array.isArray(payload.skipped_files) && payload.skipped_files.length > 0) {
+      setText(
+        resultsError,
+        `Processed ${payload.total_files} readable file(s). Skipped: ${payload.skipped_files.map((item) => item.file).join(", ")}`
+      );
+    } else {
+      setText(resultsError, "");
+    }
     showLayer(4);
   } catch (error) {
     showLayer(2);
@@ -145,8 +182,7 @@ async function startScan() {
 }
 
 function formatDate(dateInput) {
-  const date = new Date(dateInput);
-  return date.toLocaleString();
+  return new Date(dateInput).toLocaleString();
 }
 
 async function loadHistory() {
@@ -155,32 +191,38 @@ async function loadHistory() {
 
   try {
     const response = await fetch("/api/scan/history");
-    const payload = await response.json();
+    const payload = await response.json().catch(() => ({}));
 
     if (!response.ok) {
       throw new Error(payload.message || "Unable to load repository.");
     }
 
     const rows = payload.history || [];
-
     if (!rows.length) {
-      historyTableBody.innerHTML = `
-        <tr>
-          <td colspan="6">No stored scan records found.</td>
-        </tr>
-      `;
+      const tr = document.createElement("tr");
+      const td = document.createElement("td");
+      td.colSpan = 6;
+      td.textContent = "No stored scan records found.";
+      tr.appendChild(td);
+      historyTableBody.appendChild(tr);
     } else {
       const fragment = document.createDocumentFragment();
       rows.forEach((row, index) => {
         const tr = document.createElement("tr");
-        tr.innerHTML = `
-          <td>${index + 1}</td>
-          <td>${row.id}</td>
-          <td>${row.file_name_1}</td>
-          <td>${row.file_name_2}</td>
-          <td>${Number(row.similarity).toFixed(2)}%</td>
-          <td>${formatDate(row.created_at)}</td>
-        `;
+        const cells = [
+          String(index + 1),
+          String(row.id ?? "-"),
+          String(row.file_name_1 ?? ""),
+          String(row.file_name_2 ?? ""),
+          `${Number(row.similarity).toFixed(2)}%`,
+          formatDate(row.created_at)
+        ];
+
+        cells.forEach((value) => {
+          const td = document.createElement("td");
+          td.textContent = value;
+          tr.appendChild(td);
+        });
         fragment.appendChild(tr);
       });
       historyTableBody.appendChild(fragment);
@@ -193,32 +235,132 @@ async function loadHistory() {
   }
 }
 
-function bindEvents() {
-  enterSystemBtn.addEventListener("click", () => showLayer(2));
-  returnHomeBtn.addEventListener("click", () => showLayer(1));
-  backToUploadBtn.addEventListener("click", () => showLayer(2));
-  returnResultsBtn.addEventListener("click", () => showLayer(4));
-  startScanBtn.addEventListener("click", startScan);
-  openRepositoryBtn.addEventListener("click", loadHistory);
-  filesInput.addEventListener("change", () => {
-    updateFileCount();
-    clearMessages();
+function playLayerReveals(layer) {
+  if (!layer) {
+    return;
+  }
+
+  const targets = Array.from(layer.querySelectorAll(".reveal"));
+  targets.forEach((target) => target.classList.remove("in"));
+
+  targets.forEach((target, index) => {
+    window.setTimeout(() => {
+      target.classList.add("in");
+    }, index * 85);
   });
+}
+
+function playHeroReveal() {
+  if (!heroTitle) {
+    return;
+  }
+
+  const text = heroTitle.dataset.text || heroTitle.textContent || "DocSim";
+  heroTitle.textContent = "";
+
+  text.split("").forEach((char, index) => {
+    const span = document.createElement("span");
+    span.className = "hero-letter";
+    span.textContent = char;
+    span.style.animationDelay = `${index * 0.08}s`;
+    heroTitle.appendChild(span);
+  });
+}
+
+function renderBookTransform() {
+  if (!bookElement) {
+    return;
+  }
+
+  const rx = 63 + pointerY * 0.12 - bookScrollOffset * 4.2;
+  const rz = -14 + pointerX * 0.08;
+  const tx = pointerX * 0.55;
+  const ty = 7 + pointerY * 0.07 - bookScrollOffset * 8;
+  bookElement.style.transform = `rotateX(${rx.toFixed(2)}deg) rotateZ(${rz.toFixed(2)}deg) translate3d(${tx.toFixed(2)}px, ${ty.toFixed(2)}vh, 0)`;
+}
+
+function initCarousel() {
+  if (!featureCarousel) {
+    return;
+  }
+
+  const step = () => Math.max(featureCarousel.clientWidth * 0.72, 260);
+  carouselPrev?.addEventListener("click", () => featureCarousel.scrollBy({ left: -step(), behavior: "smooth" }));
+  carouselNext?.addEventListener("click", () => featureCarousel.scrollBy({ left: step(), behavior: "smooth" }));
+
+  let isDown = false;
+  let startX = 0;
+  let startScroll = 0;
+
+  featureCarousel.addEventListener("pointerdown", (event) => {
+    isDown = true;
+    startX = event.clientX;
+    startScroll = featureCarousel.scrollLeft;
+    featureCarousel.setPointerCapture(event.pointerId);
+  });
+
+  featureCarousel.addEventListener("pointermove", (event) => {
+    if (!isDown) {
+      return;
+    }
+    const delta = event.clientX - startX;
+    featureCarousel.scrollLeft = startScroll - delta;
+  });
+
+  const stopDrag = () => {
+    isDown = false;
+  };
+
+  featureCarousel.addEventListener("pointerup", stopDrag);
+  featureCarousel.addEventListener("pointercancel", stopDrag);
+  featureCarousel.addEventListener("pointerleave", stopDrag);
 }
 
 function initParallax() {
   window.addEventListener("mousemove", (event) => {
-    const x = (event.clientX / window.innerWidth - 0.5) * 16;
-    const y = (event.clientY / window.innerHeight - 0.5) * 16;
+    const x = (event.clientX / window.innerWidth - 0.5) * 20;
+    const y = (event.clientY / window.innerHeight - 0.5) * 20;
+    pointerX = x;
+    pointerY = y;
 
     parallaxTargets.forEach((item, index) => {
-      const depth = (index + 1) * 0.45;
+      const depth = (index + 1) * 0.42;
       item.style.transform = `translate3d(${(-x * depth).toFixed(2)}px, ${(-y * depth).toFixed(2)}px, 0)`;
     });
+
+    renderBookTransform();
+  });
+}
+
+function initHeroScrollParallax() {
+  if (!heroPanel) {
+    return;
+  }
+
+  heroPanel.addEventListener("scroll", () => {
+    const maxScroll = heroPanel.scrollHeight - heroPanel.clientHeight;
+    bookScrollOffset = maxScroll > 0 ? heroPanel.scrollTop / maxScroll : 0;
+    renderBookTransform();
+  });
+}
+
+function bindEvents() {
+  enterSystemBtn?.addEventListener("click", () => showLayer(2));
+  returnHomeBtn?.addEventListener("click", () => showLayer(1));
+  backToUploadBtn?.addEventListener("click", () => showLayer(2));
+  returnResultsBtn?.addEventListener("click", () => showLayer(4));
+  startScanBtn?.addEventListener("click", startScan);
+  openRepositoryBtn?.addEventListener("click", loadHistory);
+  filesInput?.addEventListener("change", () => {
+    updateFileCount();
+    clearMessages();
   });
 }
 
 bindEvents();
 updateFileCount();
 initParallax();
+initCarousel();
+initHeroScrollParallax();
+playHeroReveal();
 showLayer(1);

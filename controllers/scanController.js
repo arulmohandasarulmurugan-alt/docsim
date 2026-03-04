@@ -1,8 +1,10 @@
 const fs = require("fs/promises");
 const path = require("path");
-const pdfParse = require("pdf-parse");
+const pdfParseModule = require("pdf-parse");
 const mammoth = require("mammoth");
 const { pool } = require("../config/db");
+
+let scanSchemaCache = null;
 
 function tokenize(text) {
   return text
@@ -25,6 +27,62 @@ function calculateJaccardSimilarity(tokensA, tokensB) {
   return intersectionSize / unionSize;
 }
 
+function pickColumn(availableColumns, candidates) {
+  return candidates.find((candidate) => availableColumns.has(candidate)) || null;
+}
+
+async function resolveScanResultsSchema() {
+  if (scanSchemaCache) {
+    return scanSchemaCache;
+  }
+
+  const [columns] = await pool.query("SHOW COLUMNS FROM scan_results");
+  const normalizedColumns = columns.map((column) => ({
+    name: String(column.Field).toLowerCase(),
+    nullable: String(column.Null).toUpperCase() === "YES",
+    hasDefault: column.Default !== null,
+    isAutoIncrement: String(column.Extra || "").toLowerCase().includes("auto_increment")
+  }));
+
+  const available = new Set(normalizedColumns.map((col) => col.name));
+
+  scanSchemaCache = {
+    columns: normalizedColumns,
+    id: pickColumn(available, ["id", "scan_id"]),
+    file1: pickColumn(available, ["file_name_1", "file_a", "file1", "file_1", "document_1", "doc_1"]),
+    file2: pickColumn(available, ["file_name_2", "file_b", "file2", "file_2", "document_2", "doc_2"]),
+    similarity: pickColumn(available, ["similarity", "similarity_score", "score"]),
+    createdAt: pickColumn(available, ["created_at", "scan_date", "createdon", "created_on", "timestamp", "createdat"])
+  };
+
+  return scanSchemaCache;
+}
+
+function resolveColumnValue(columnName, firstFileName, secondFileName, percentage) {
+  const file1Names = new Set(["file_name_1", "file_a", "file1", "file_1", "document_1", "doc_1"]);
+  const file2Names = new Set(["file_name_2", "file_b", "file2", "file_2", "document_2", "doc_2"]);
+  const similarityNames = new Set(["similarity", "similarity_score", "score"]);
+  const dateNames = new Set(["created_at", "scan_date", "createdon", "created_on", "timestamp", "createdat"]);
+
+  if (file1Names.has(columnName)) {
+    return firstFileName;
+  }
+
+  if (file2Names.has(columnName)) {
+    return secondFileName;
+  }
+
+  if (similarityNames.has(columnName)) {
+    return percentage;
+  }
+
+  if (dateNames.has(columnName)) {
+    return new Date();
+  }
+
+  return undefined;
+}
+
 async function extractFileText(file) {
   const extension = path.extname(file.originalname).toLowerCase();
 
@@ -34,8 +92,27 @@ async function extractFileText(file) {
 
   if (extension === ".pdf") {
     const buffer = await fs.readFile(file.path);
-    const parsed = await pdfParse(buffer);
-    return parsed.text || "";
+    if (typeof pdfParseModule === "function") {
+      const parsed = await pdfParseModule(buffer);
+      return parsed.text || "";
+    }
+
+    if (pdfParseModule && typeof pdfParseModule.PDFParse === "function") {
+      const parser = new pdfParseModule.PDFParse({ data: buffer });
+      try {
+        const parsed = await parser.getText();
+        if (typeof parsed === "string") {
+          return parsed;
+        }
+        return parsed?.text || "";
+      } finally {
+        if (typeof parser.destroy === "function") {
+          await parser.destroy();
+        }
+      }
+    }
+
+    throw new Error("Unsupported pdf-parse API version.");
   }
 
   if (extension === ".docx") {
@@ -72,15 +149,46 @@ async function compareDocuments(req, res) {
   }
 
   try {
-    const extractedFiles = await Promise.all(
-      uploadedFiles.map(async (file) => {
+    const schema = await resolveScanResultsSchema();
+
+    if (!schema.file1 || !schema.file2 || !schema.similarity) {
+      throw new Error(
+        "scan_results table is missing required columns. Expected file_name_1/file_name_2/similarity (or compatible aliases)."
+      );
+    }
+
+    const extractedFiles = [];
+    const skippedFiles = [];
+
+    for (const file of uploadedFiles) {
+      try {
         const text = await extractFileText(file);
-        return {
+        extractedFiles.push({
           originalname: file.originalname,
           tokens: tokenize(text)
-        };
-      })
-    );
+        });
+      } catch (error) {
+        skippedFiles.push({
+          file: file.originalname,
+          reason: error.message
+        });
+      }
+    }
+
+    if (extractedFiles.length < 2) {
+      const reason = skippedFiles.length
+        ? `Only ${extractedFiles.length} readable file(s). Skipped: ${skippedFiles.map((x) => x.file).join(", ")}`
+        : "Need at least 2 readable files.";
+      throw new Error(reason);
+    }
+
+    const requiredColumns = schema.columns
+      .filter((column) => !column.nullable && !column.hasDefault && !column.isAutoIncrement)
+      .map((column) => column.name);
+
+    const insertColumnSet = new Set([schema.file1, schema.file2, schema.similarity].filter(Boolean));
+    requiredColumns.forEach((requiredColumn) => insertColumnSet.add(requiredColumn));
+    const insertColumns = [...insertColumnSet];
 
     const results = [];
     const insertValues = [];
@@ -98,24 +206,42 @@ async function compareDocuments(req, res) {
           similarity_percentage: percentage
         });
 
-        insertValues.push([firstFile.originalname, secondFile.originalname, percentage]);
+        const rowValues = insertColumns.map((columnName) => {
+          const value = resolveColumnValue(
+            columnName,
+            firstFile.originalname,
+            secondFile.originalname,
+            percentage
+          );
+
+          if (value === undefined) {
+            throw new Error(`Unsupported required column "${columnName}" in scan_results.`);
+          }
+
+          return value;
+        });
+
+        insertValues.push(rowValues);
       }
     }
 
     if (insertValues.length > 0) {
+      const escapedColumns = insertColumns.map((column) => `\`${column}\``).join(", ");
       await pool.query(
-        "INSERT INTO scan_results (file_name_1, file_name_2, similarity) VALUES ?",
+        `INSERT INTO scan_results (${escapedColumns}) VALUES ?`,
         [insertValues]
       );
     }
 
     res.status(200).json({
       success: true,
-      total_files: uploadedFiles.length,
+      total_files: extractedFiles.length,
       total_pairs: results.length,
+      skipped_files: skippedFiles,
       results
     });
   } catch (error) {
+    console.error("Scan processing failed:", error);
     res.status(500).json({
       success: false,
       message: "Failed to process scan request.",
@@ -128,8 +254,24 @@ async function compareDocuments(req, res) {
 
 async function getScanHistory(req, res) {
   try {
+    const schema = await resolveScanResultsSchema();
+
+    if (!schema.file1 || !schema.file2 || !schema.similarity) {
+      throw new Error(
+        "scan_results table is missing required columns. Expected file_name_1/file_name_2/similarity (or compatible aliases)."
+      );
+    }
+
+    const idSelect = schema.id ? `\`${schema.id}\` AS id` : "NULL AS id";
+    const createdSelect = schema.createdAt ? `\`${schema.createdAt}\` AS created_at` : "CURRENT_TIMESTAMP AS created_at";
+    const orderBy = schema.createdAt
+      ? `ORDER BY \`${schema.createdAt}\` DESC`
+      : schema.id
+        ? `ORDER BY \`${schema.id}\` DESC`
+        : "";
+
     const [rows] = await pool.query(
-      "SELECT id, file_name_1, file_name_2, similarity, created_at FROM scan_results ORDER BY created_at DESC, id DESC"
+      `SELECT ${idSelect}, \`${schema.file1}\` AS file_name_1, \`${schema.file2}\` AS file_name_2, \`${schema.similarity}\` AS similarity, ${createdSelect} FROM scan_results ${orderBy}`
     );
 
     res.status(200).json({

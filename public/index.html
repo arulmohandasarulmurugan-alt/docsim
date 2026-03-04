@@ -7,26 +7,64 @@
   <meta name="description" content="DocSim compares TXT, PDF, and DOCX files using the Jaccard Similarity algorithm.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;800&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Orbitron:wght@500;700;800&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="./style.css">
 </head>
 <body>
   <div id="hyperspeed-canvas" aria-hidden="true"></div>
+  <div id="book-scene" aria-hidden="true">
+    <div class="book">
+      <div class="spine"></div>
+      <div class="pages" id="bookPages"></div>
+    </div>
+  </div>
+  <div id="rune-stream" aria-hidden="true"></div>
+  <div class="aurora-overlay" aria-hidden="true"></div>
   <div class="vignette" aria-hidden="true"></div>
   <div class="noise-overlay" aria-hidden="true"></div>
 
   <main class="app-shell">
     <section id="layer1" class="layer active" data-layer="1">
-      <div class="panel panel-center parallax">
-        <p class="eyebrow">Neural Similarity Platform</p>
-        <h1>DocSim</h1>
-        <p class="subtitle">Document Similarity Detection System</p>
-        <button id="enterSystemBtn" class="btn btn-primary">ENTER SYSTEM</button>
+      <div class="panel panel-scroll parallax">
+        <div class="hero-block reveal">
+          <p class="eyebrow">Arcane Similarity Engine</p>
+          <h1 id="heroTitle" data-text="DocSim">DocSim</h1>
+          <p class="subtitle">Document Similarity Detection System</p>
+          <button id="enterSystemBtn" class="btn btn-primary">Enter System</button>
+        </div>
+
+        <div class="carousel-shell reveal">
+          <div class="carousel-top">
+            <h2>Interactive Workflow</h2>
+            <div class="carousel-controls">
+              <button id="carouselPrev" class="btn btn-ghost" type="button">Prev</button>
+              <button id="carouselNext" class="btn btn-ghost" type="button">Next</button>
+            </div>
+          </div>
+          <div id="featureCarousel" class="feature-carousel">
+            <article class="feature-card">
+              <h3>Deep Text Parsing</h3>
+              <p>TXT, PDF, and DOCX are parsed and normalized with robust token cleaning.</p>
+            </article>
+            <article class="feature-card">
+              <h3>Jaccard Matrix</h3>
+              <p>Pairwise similarity is computed with optimized set intersections.</p>
+            </article>
+            <article class="feature-card">
+              <h3>History Vault</h3>
+              <p>Every scan is preserved and visualized in a searchable repository table.</p>
+            </article>
+            <article class="feature-card">
+              <h3>Motion Interface</h3>
+              <p>Parallax layers, card tilt, and cinematic transitions keep the UI responsive.</p>
+            </article>
+          </div>
+        </div>
       </div>
     </section>
 
     <section id="layer2" class="layer" data-layer="2">
-      <div class="panel upload-panel parallax">
+      <div class="panel upload-panel parallax reveal">
         <h2>Upload Documents (2-100)</h2>
         <p class="hint">Supported formats: TXT, PDF, DOCX</p>
         <label class="file-input-wrap" for="filesInput">
@@ -44,10 +82,17 @@
     </section>
 
     <section id="layer3" class="layer" data-layer="3">
-      <div class="panel panel-center scanning-panel parallax">
-        <div class="radar-wrap">
-          <div class="radar">
-            <div class="sweep"></div>
+      <div class="panel panel-center scanning-panel parallax reveal">
+        <div class="scan-loader-wrap" aria-hidden="true">
+          <div class="scan-loader">
+            <span><span></span><span></span><span></span><span></span></span>
+            <div class="scan-base">
+              <span></span>
+              <div class="scan-face"></div>
+            </div>
+          </div>
+          <div class="scan-longfazers">
+            <span></span><span></span><span></span><span></span>
           </div>
         </div>
         <h2>Scanning Documents...</h2>
@@ -57,7 +102,7 @@
 
     <section id="layer4" class="layer" data-layer="4">
       <div class="panel results-panel parallax">
-        <div class="formula">J(A,B) = |A ∩ B| / |A ∪ B|</div>
+        <div class="formula reveal">J(A,B) = |A ∩ B| / |A ∪ B|</div>
         <div id="resultsGrid" class="results-grid" aria-live="polite"></div>
         <p id="resultsError" class="inline-message error" role="alert"></p>
         <div class="btn-row">
@@ -69,10 +114,10 @@
 
     <section id="layer5" class="layer" data-layer="5">
       <div class="panel repo-panel parallax">
-        <h2>Global Repository</h2>
-        <p class="hint">Stored comparison records ordered by newest first.</p>
+        <h2 class="reveal">Global Repository</h2>
+        <p class="hint reveal">Stored comparison records ordered by newest first.</p>
         <p id="historyError" class="inline-message error" role="alert"></p>
-        <div class="table-wrap">
+        <div class="table-wrap reveal">
           <table>
             <thead>
               <tr>
@@ -94,7 +139,6 @@
     </section>
   </main>
 
-  <script src="https://unpkg.com/three@0.161.0/build/three.min.js"></script>
   <script src="./hyperspeed.js"></script>
   <script src="./app.js"></script>
 </body>
