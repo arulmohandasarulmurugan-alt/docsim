@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DocSim | Document Similarity Detection System</title>
+  <meta name="description" content="DocSim compares TXT, PDF, and DOCX files using the Jaccard Similarity algorithm.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;800&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <div id="hyperspeed-canvas" aria-hidden="true"></div>
+  <div class="vignette" aria-hidden="true"></div>
+  <div class="noise-overlay" aria-hidden="true"></div>
+
+  <main class="app-shell">
+    <section id="layer1" class="layer active" data-layer="1">
+      <div class="panel panel-center parallax">
+        <p class="eyebrow">Neural Similarity Platform</p>
+        <h1>DocSim</h1>
+        <p class="subtitle">Document Similarity Detection System</p>
+        <button id="enterSystemBtn" class="btn btn-primary">ENTER SYSTEM</button>
+      </div>
+    </section>
+
+    <section id="layer2" class="layer" data-layer="2">
+      <div class="panel upload-panel parallax">
+        <h2>Upload Documents (2-100)</h2>
+        <p class="hint">Supported formats: TXT, PDF, DOCX</p>
+        <label class="file-input-wrap" for="filesInput">
+          <input id="filesInput" type="file" name="files" accept=".txt,.pdf,.docx" multiple>
+          <span>Select Files</span>
+        </label>
+        <p id="fileCount" class="file-count">No files selected</p>
+        <p id="uploadError" class="inline-message error" role="alert"></p>
+        <p id="uploadInfo" class="inline-message info"></p>
+        <div class="btn-row">
+          <button id="startScanBtn" class="btn btn-primary">Start Scan</button>
+          <button id="returnHomeBtn" class="btn btn-secondary">Return Home</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="layer3" class="layer" data-layer="3">
+      <div class="panel panel-center scanning-panel parallax">
+        <div class="radar-wrap">
+          <div class="radar">
+            <div class="sweep"></div>
+          </div>
+        </div>
+        <h2>Scanning Documents...</h2>
+        <p>Please wait while similarity vectors are computed.</p>
+      </div>
+    </section>
+
+    <section id="layer4" class="layer" data-layer="4">
+      <div class="panel results-panel parallax">
+        <div class="formula">J(A,B) = |A ∩ B| / |A ∪ B|</div>
+        <div id="resultsGrid" class="results-grid" aria-live="polite"></div>
+        <p id="resultsError" class="inline-message error" role="alert"></p>
+        <div class="btn-row">
+          <button id="openRepositoryBtn" class="btn btn-primary">View Global Repository</button>
+          <button id="backToUploadBtn" class="btn btn-secondary">Return to Upload</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="layer5" class="layer" data-layer="5">
+      <div class="panel repo-panel parallax">
+        <h2>Global Repository</h2>
+        <p class="hint">Stored comparison records ordered by newest first.</p>
+        <p id="historyError" class="inline-message error" role="alert"></p>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Serial Number</th>
+                <th>ID</th>
+                <th>File 1</th>
+                <th>File 2</th>
+                <th>Similarity Percentage</th>
+                <th>Date &amp; Time</th>
+              </tr>
+            </thead>
+            <tbody id="historyTableBody"></tbody>
+          </table>
+        </div>
+        <div class="btn-row">
+          <button id="returnResultsBtn" class="btn btn-secondary">Return to Results</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="https://unpkg.com/three@0.161.0/build/three.min.js"></script>
+  <script src="./hyperspeed.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>
