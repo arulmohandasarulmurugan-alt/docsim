@@ -31,6 +31,43 @@ function pickColumn(availableColumns, candidates) {
   return candidates.find((candidate) => availableColumns.has(candidate)) || null;
 }
 
+function parseDecimalType(typeString) {
+  const match = /^decimal\((\d+),\s*(\d+)\)$/i.exec(String(typeString || "").trim());
+  if (!match) {
+    return null;
+  }
+  return {
+    precision: Number(match[1]),
+    scale: Number(match[2])
+  };
+}
+
+function fitNumericValue(value, columnMeta) {
+  if (!columnMeta) {
+    return value;
+  }
+
+  const decimalInfo = parseDecimalType(columnMeta.type);
+  if (!decimalInfo) {
+    return value;
+  }
+
+  const { precision, scale } = decimalInfo;
+  const maxAbs = Math.pow(10, precision - scale) - Math.pow(10, -scale);
+  let adjusted = Number(value);
+
+  // Legacy "score" columns are often fractional (0 to 1), while app similarity is 0 to 100.
+  if (columnMeta.name === "score" && adjusted > maxAbs && adjusted <= 100 && maxAbs <= 1.9999) {
+    adjusted = adjusted / 100;
+  }
+
+  if (Math.abs(adjusted) > maxAbs) {
+    adjusted = adjusted < 0 ? -maxAbs : maxAbs;
+  }
+
+  return Number(adjusted.toFixed(scale));
+}
+
 async function resolveScanResultsSchema() {
   if (scanSchemaCache) {
     return scanSchemaCache;
@@ -41,13 +78,16 @@ async function resolveScanResultsSchema() {
     name: String(column.Field).toLowerCase(),
     nullable: String(column.Null).toUpperCase() === "YES",
     hasDefault: column.Default !== null,
-    isAutoIncrement: String(column.Extra || "").toLowerCase().includes("auto_increment")
+    isAutoIncrement: String(column.Extra || "").toLowerCase().includes("auto_increment"),
+    type: String(column.Type || "")
   }));
 
   const available = new Set(normalizedColumns.map((col) => col.name));
+  const columnMeta = Object.fromEntries(normalizedColumns.map((col) => [col.name, col]));
 
   scanSchemaCache = {
     columns: normalizedColumns,
+    columnMeta,
     id: pickColumn(available, ["id", "scan_id"]),
     file1: pickColumn(available, ["file_name_1", "file_a", "file1", "file_1", "document_1", "doc_1"]),
     file2: pickColumn(available, ["file_name_2", "file_b", "file2", "file_2", "document_2", "doc_2"]),
@@ -58,7 +98,7 @@ async function resolveScanResultsSchema() {
   return scanSchemaCache;
 }
 
-function resolveColumnValue(columnName, firstFileName, secondFileName, percentage) {
+function resolveColumnValue(columnName, firstFileName, secondFileName, percentage, schema) {
   const file1Names = new Set(["file_name_1", "file_a", "file1", "file_1", "document_1", "doc_1"]);
   const file2Names = new Set(["file_name_2", "file_b", "file2", "file_2", "document_2", "doc_2"]);
   const similarityNames = new Set(["similarity", "similarity_score", "score"]);
@@ -73,7 +113,7 @@ function resolveColumnValue(columnName, firstFileName, secondFileName, percentag
   }
 
   if (similarityNames.has(columnName)) {
-    return percentage;
+    return fitNumericValue(percentage, schema.columnMeta[columnName]);
   }
 
   if (dateNames.has(columnName)) {
@@ -211,7 +251,8 @@ async function compareDocuments(req, res) {
             columnName,
             firstFile.originalname,
             secondFile.originalname,
-            percentage
+            percentage,
+            schema
           );
 
           if (value === undefined) {

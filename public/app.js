@@ -1,8 +1,8 @@
 const layers = Array.from(document.querySelectorAll(".layer"));
 const parallaxTargets = Array.from(document.querySelectorAll(".parallax"));
-const revealTargets = Array.from(document.querySelectorAll(".reveal"));
-
 const enterSystemBtn = document.getElementById("enterSystemBtn");
+const enterIntroBtn = document.getElementById("enterIntroBtn");
+const introGate = document.getElementById("introGate");
 const startScanBtn = document.getElementById("startScanBtn");
 const returnHomeBtn = document.getElementById("returnHomeBtn");
 const openRepositoryBtn = document.getElementById("openRepositoryBtn");
@@ -10,7 +10,10 @@ const backToUploadBtn = document.getElementById("backToUploadBtn");
 const returnResultsBtn = document.getElementById("returnResultsBtn");
 
 const filesInput = document.getElementById("filesInput");
+const chooseFilesBtn = document.getElementById("chooseFilesBtn");
+const clearFilesBtn = document.getElementById("clearFilesBtn");
 const fileCount = document.getElementById("fileCount");
+const selectedFilesPreview = document.getElementById("selectedFilesPreview");
 const uploadError = document.getElementById("uploadError");
 const uploadInfo = document.getElementById("uploadInfo");
 const resultsError = document.getElementById("resultsError");
@@ -28,6 +31,8 @@ const heroPanel = document.querySelector("#layer1 .panel-scroll");
 let pointerX = 0;
 let pointerY = 0;
 let bookScrollOffset = 0;
+let selectedFiles = [];
+const ALLOWED_EXTENSIONS = new Set(["txt", "pdf", "docx"]);
 
 function showLayer(layerNumber) {
   layers.forEach((layer) => {
@@ -60,8 +65,42 @@ function clearMessages() {
 }
 
 function updateFileCount() {
-  const total = filesInput.files.length;
+  const total = selectedFiles.length;
   setText(fileCount, total ? `${total} file${total > 1 ? "s" : ""} selected` : "No files selected");
+  if (!total) {
+    setText(selectedFilesPreview, "");
+    return;
+  }
+
+  const previewNames = selectedFiles.slice(0, 4).map((file) => file.name);
+  const suffix = total > 4 ? ` +${total - 4} more` : "";
+  setText(selectedFilesPreview, previewNames.join(", ") + suffix);
+}
+
+function syncUploadState() {
+  const total = selectedFiles.length;
+
+  if (total === 0) {
+    startScanBtn.disabled = false;
+    return;
+  }
+
+  if (total < 2) {
+    setText(uploadError, "Select at least 2 files.");
+    startScanBtn.disabled = true;
+    return;
+  }
+
+  if (total > 100) {
+    setText(uploadError, "You can select maximum 100 files.");
+    filesInput.value = "";
+    updateFileCount();
+    startScanBtn.disabled = false;
+    return;
+  }
+
+  setText(uploadError, "");
+  startScanBtn.disabled = false;
 }
 
 function validateFiles(files) {
@@ -73,15 +112,43 @@ function validateFiles(files) {
     return "You can upload up to 100 files only.";
   }
 
-  const allowedExt = new Set(["txt", "pdf", "docx"]);
   for (const file of files) {
     const extension = file.name.split(".").pop().toLowerCase();
-    if (!allowedExt.has(extension)) {
+    if (!ALLOWED_EXTENSIONS.has(extension)) {
       return `Unsupported file type: ${file.name}. Allowed: TXT, PDF, DOCX.`;
     }
   }
 
   return null;
+}
+
+function addPickedFiles(pickedFiles) {
+  const keyed = new Map(selectedFiles.map((file) => [`${file.name}|${file.size}|${file.lastModified}`, file]));
+  const invalidFiles = [];
+  let ignoredByLimit = 0;
+
+  pickedFiles.forEach((file) => {
+    const extension = file.name.includes(".") ? file.name.split(".").pop().toLowerCase() : "";
+    if (!ALLOWED_EXTENSIONS.has(extension)) {
+      invalidFiles.push(file.name);
+      return;
+    }
+    const key = `${file.name}|${file.size}|${file.lastModified}`;
+    if (!keyed.has(key) && keyed.size >= 100) {
+      ignoredByLimit += 1;
+      return;
+    }
+    keyed.set(key, file);
+  });
+  selectedFiles = Array.from(keyed.values());
+
+  if (invalidFiles.length > 0) {
+    setText(uploadError, `Ignored unsupported file(s): ${invalidFiles.slice(0, 3).join(", ")}${invalidFiles.length > 3 ? "..." : ""}`);
+  } else if (ignoredByLimit > 0) {
+    setText(uploadError, `Maximum 100 files allowed. Ignored ${ignoredByLimit} extra file(s).`);
+  } else {
+    setText(uploadError, "");
+  }
 }
 
 function renderResults(results) {
@@ -140,7 +207,7 @@ function renderResults(results) {
 
 async function startScan() {
   clearMessages();
-  const files = Array.from(filesInput.files);
+  const files = [...selectedFiles];
   const validationError = validateFiles(files);
 
   if (validationError) {
@@ -255,6 +322,10 @@ function playHeroReveal() {
     return;
   }
 
+  if (heroTitle.dataset.static === "true") {
+    return;
+  }
+
   const text = heroTitle.dataset.text || heroTitle.textContent || "DocSim";
   heroTitle.textContent = "";
 
@@ -345,20 +416,56 @@ function initHeroScrollParallax() {
 }
 
 function bindEvents() {
+  enterIntroBtn?.addEventListener("click", () => {
+    introGate?.classList.remove("active");
+    showLayer(1);
+  });
   enterSystemBtn?.addEventListener("click", () => showLayer(2));
   returnHomeBtn?.addEventListener("click", () => showLayer(1));
   backToUploadBtn?.addEventListener("click", () => showLayer(2));
   returnResultsBtn?.addEventListener("click", () => showLayer(4));
   startScanBtn?.addEventListener("click", startScan);
   openRepositoryBtn?.addEventListener("click", loadHistory);
-  filesInput?.addEventListener("change", () => {
+  clearFilesBtn?.addEventListener("click", () => {
+    selectedFiles = [];
+    filesInput.value = "";
     updateFileCount();
+    syncUploadState();
     clearMessages();
+  });
+  filesInput?.addEventListener("change", () => {
+    const pickedFiles = Array.from(filesInput.files || []);
+    addPickedFiles(pickedFiles);
+    filesInput.value = "";
+    updateFileCount();
+    syncUploadState();
+    setText(uploadInfo, "Allowed: any combination of TXT/PDF/DOCX (same or mixed), 2 to 100 files.");
+    setText(resultsError, "");
+    setText(historyError, "");
+  });
+
+  // Fallback delegation to guarantee layer navigation even if a direct listener fails.
+  document.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
+
+    if (target.id === "enterSystemBtn") {
+      showLayer(2);
+    } else if (target.id === "returnHomeBtn") {
+      showLayer(1);
+    } else if (target.id === "backToUploadBtn") {
+      showLayer(2);
+    } else if (target.id === "returnResultsBtn") {
+      showLayer(4);
+    }
   });
 }
 
 bindEvents();
 updateFileCount();
+syncUploadState();
 initParallax();
 initCarousel();
 initHeroScrollParallax();

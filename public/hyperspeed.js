@@ -1,4 +1,20 @@
 (async function hyperspeedInit() {
+  const hyperspeedPresets = {
+    one: {
+      canvasStarCount: 760,
+      threeStarCount: 1400,
+      starRadius: 26,
+      depth: 900,
+      speedMin: 0.6,
+      speedMax: 1.6,
+      colorHex: 0xcf96ff,
+      pointSize: 0.105,
+      opacity: 0.96
+    }
+  };
+
+  const effectOptions = hyperspeedPresets.one;
+
   const mount = document.getElementById("hyperspeed-canvas");
   const pagesMount = document.getElementById("bookPages");
   const runeStream = document.getElementById("rune-stream");
@@ -76,7 +92,7 @@
     mount.appendChild(canvas);
 
     const stars = [];
-    const starCount = 760;
+    const starCount = effectOptions.canvasStarCount;
 
     function resize() {
       canvas.width = window.innerWidth;
@@ -153,9 +169,9 @@
     renderer.setSize(window.innerWidth, window.innerHeight);
     mount.appendChild(renderer.domElement);
 
-    const starCount = 1400;
-    const radius = 26;
-    const depth = 900;
+    const starCount = effectOptions.threeStarCount;
+    const radius = effectOptions.starRadius;
+    const depth = effectOptions.depth;
     const positions = new Float32Array(starCount * 3);
     const velocities = new Float32Array(starCount);
 
@@ -166,17 +182,17 @@
       positions[i3] = Math.cos(angle) * spread;
       positions[i3 + 1] = Math.sin(angle) * spread;
       positions[i3 + 2] = -Math.random() * depth;
-      velocities[i] = 0.6 + Math.random() * 1.6;
+      velocities[i] = effectOptions.speedMin + Math.random() * effectOptions.speedMax;
     }
 
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
 
     const pointsMaterial = new THREE.PointsMaterial({
-      color: 0xcf96ff,
-      size: 0.105,
+      color: effectOptions.colorHex,
+      size: effectOptions.pointSize,
       transparent: true,
-      opacity: 0.96,
+      opacity: effectOptions.opacity,
       blending: THREE.AdditiveBlending,
       depthWrite: false
     });

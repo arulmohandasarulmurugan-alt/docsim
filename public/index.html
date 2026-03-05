@@ -7,10 +7,19 @@
   <meta name="description" content="DocSim compares TXT, PDF, and DOCX files using the Jaccard Similarity algorithm.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Orbitron:wght@500;700;800&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Orbitron:wght@500;700;800&family=Rajdhani:wght@400;500;600;700&family=Syne:wght@400;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./style.css?v=12">
 </head>
 <body>
+  <div id="introGate" class="intro-gate active">
+    <div class="intro-core">
+      <p class="intro-tag">DocSim HyperCore</p>
+      <h2>3D Similarity Console</h2>
+      <p>Neon document intelligence with pairwise Jaccard matrix scanning.</p>
+      <button id="enterIntroBtn" class="btn btn-primary" type="button">Launch Interface</button>
+    </div>
+  </div>
+
   <div id="hyperspeed-canvas" aria-hidden="true"></div>
   <div id="book-scene" aria-hidden="true">
     <div class="book">
@@ -26,11 +35,45 @@
   <main class="app-shell">
     <section id="layer1" class="layer active" data-layer="1">
       <div class="panel panel-scroll parallax">
-        <div class="hero-block reveal">
-          <p class="eyebrow">Arcane Similarity Engine</p>
-          <h1 id="heroTitle" data-text="DocSim">DocSim</h1>
-          <p class="subtitle">Document Similarity Detection System</p>
-          <button id="enterSystemBtn" class="btn btn-primary">Enter System</button>
+        <div class="hero-scope reveal">
+          <div class="float-doc fd1">
+            <div class="fd-bar l"></div>
+            <div class="fd-bar"></div>
+            <div class="fd-bar s"></div>
+            doc_thesis.pdf
+          </div>
+          <div class="float-doc fd2">
+            <div class="fd-bar"></div>
+            <div class="fd-bar l"></div>
+            report_2024.docx
+          </div>
+          <div class="float-doc fd3">
+            <div class="fd-bar s"></div>
+            <div class="fd-bar"></div>
+            essay_final.txt
+          </div>
+          <div class="float-doc fd4">
+            <div class="fd-bar l"></div>
+            <div class="fd-bar s"></div>
+            research_v2.pdf
+          </div>
+
+          <div class="hero-inner">
+            <div class="hero-eyebrow">// Document Intelligence Engine</div>
+            <h1 id="heroTitle" class="hero-title" data-text="DocSim" data-static="true">
+              Doc<span class="highlight">Sim</span>
+            </h1>
+            <p class="hero-sub">
+              Upload. Compare. Discover. A blazing-fast similarity engine that cross-checks bulk documents using Jaccard
+              intersection and stores fingerprints in a global repository.
+            </p>
+            <button id="enterSystemBtn" class="btn-enter" type="button">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+                <path d="M5 12h14M12 5l7 7-7 7"></path>
+              </svg>
+              Enter the System
+            </button>
+          </div>
         </div>
 
         <div class="carousel-shell reveal">
@@ -66,16 +109,18 @@
     <section id="layer2" class="layer" data-layer="2">
       <div class="panel upload-panel parallax reveal">
         <h2>Upload Documents (2-100)</h2>
-        <p class="hint">Supported formats: TXT, PDF, DOCX</p>
-        <label class="file-input-wrap" for="filesInput">
-          <input id="filesInput" type="file" name="files" accept=".txt,.pdf,.docx" multiple>
-          <span>Select Files</span>
-        </label>
+        <p class="hint">Supported formats: TXT, PDF, DOCX (mixed or same type, total 2 to 100 files)</p>
+        <div class="file-picker">
+          <label id="chooseFilesBtn" class="file-input-wrap" for="filesInput">Select Files</label>
+          <input id="filesInput" class="picker-overlay-input" type="file" name="files" accept=".txt,.pdf,.docx,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" multiple>
+        </div>
         <p id="fileCount" class="file-count">No files selected</p>
+        <p id="selectedFilesPreview" class="hint"></p>
         <p id="uploadError" class="inline-message error" role="alert"></p>
         <p id="uploadInfo" class="inline-message info"></p>
         <div class="btn-row">
           <button id="startScanBtn" class="btn btn-primary">Start Scan</button>
+          <button id="clearFilesBtn" class="btn btn-ghost" type="button">Clear Files</button>
           <button id="returnHomeBtn" class="btn btn-secondary">Return Home</button>
         </div>
       </div>
@@ -102,7 +147,7 @@
 
     <section id="layer4" class="layer" data-layer="4">
       <div class="panel results-panel parallax">
-        <div class="formula reveal">J(A,B) = |A ∩ B| / |A ∪ B|</div>
+        <div class="formula reveal">J(A,B) = |A intersect B| / |A union B|</div>
         <div id="resultsGrid" class="results-grid" aria-live="polite"></div>
         <p id="resultsError" class="inline-message error" role="alert"></p>
         <div class="btn-row">
@@ -139,7 +184,7 @@
     </section>
   </main>
 
-  <script src="./hyperspeed.js"></script>
-  <script src="./app.js"></script>
+  <script src="./hyperspeed.js?v=12"></script>
+  <script src="./app.js?v=12"></script>
 </body>
 </html>

@@ -32,14 +32,37 @@ app.get("*", (req, res) => {
 async function startServer() {
   await testDatabaseConnection();
 
-  app.listen(PORT, () => {
-    if (PORT === 3000) {
-      console.log("Server running on port 3000");
+  const triedPorts = new Set();
+
+  function tryListen(port) {
+    if (triedPorts.has(port)) {
       return;
     }
 
-    console.log(`Server running on port ${PORT}`);
-  });
+    triedPorts.add(port);
+    const server = app.listen(port, () => {
+      if (port === 3000) {
+        console.log("Server running on port 3000");
+      } else {
+        console.log(`Server running on port ${port}`);
+      }
+      console.log(`Open: http://localhost:${port}`);
+    });
+
+    server.on("error", (error) => {
+      if (error.code === "EADDRINUSE") {
+        const nextPort = port + 1;
+        console.warn(`Port ${port} is already in use. Trying ${nextPort}...`);
+        tryListen(nextPort);
+        return;
+      }
+
+      console.error("Server startup failed:", error.message);
+      process.exit(1);
+    });
+  }
+
+  tryListen(PORT);
 }
 
 startServer();
